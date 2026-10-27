@@ -1,0 +1,26 @@
+{
+  "index": "studymate_materials",
+  "mappings": {
+    "properties": {
+      "materialId": { "type": "long" },
+      "title":    { "type": "text", "analyzer": "standard" },
+      "summary":  { "type": "text" },
+      "category": { "type": "keyword" },
+      "content":  { "type": "text", "analyzer": "standard" },
+      "difficulty":{ "type": "integer" },
+      "createdAt":{ "type": "date" }
+    }
+  },
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "analysis": {
+      "analyzer": {
+        "ik_max": {
+          "type": "custom",
+          "tokenizer": "ik_max_word"
+        }
+      }
+    }
+  }
+}
