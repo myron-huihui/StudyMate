@@ -1,0 +1,236 @@
+server:
+  port: 18080
+
+spring:
+  application:
+    name: studymate-api
+
+  # MySQL（自定义前缀由 DataSourceBuilder 绑定，Hikari 参数需平铺而非嵌套 hikari）
+  datasource:
+    mysql:
+      jdbc-url: jdbc:mysql://localhost:3306/studymate?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8
+      username: ${MYSQL_USER:root}
+      password: ${MYSQL_PASSWORD:root}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+
+    # pgVector
+    pgvector:
+      jdbc-url: jdbc:postgresql://localhost:5432/studymate
+      username: ${POSTGRES_USER:postgres}
+      password: ${POSTGRES_PASSWORD:postgres}
+      driver-class-name: org.postgresql.Driver
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  # Redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+
+  # Elasticsearch
+  elasticsearch:
+    uris: http://localhost:9200
+    username: ${ELASTIC_USER:elastic}
+    password: ${ELASTIC_PASSWORD:elastic}
+
+  # OpenAI 兼容（百炼 DashScope）
+  ai:
+    openai:
+      api-key: ${BAILIAN_API_KEY:}
+      base-url: ${BAILIAN_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
+      chat:
+        options:
+          model: deepseek-v4.1-flash
+          temperature: 0.7
+          max-tokens: 4096
+      embedding:
+        options:
+          model: qwen3.7-text-embedding
+          dimensions: 1024
+
+# JWT / 授权码（与 gateway 的 security.jwt 保持一致）
+security:
+  jwt:
+    secret: ${JWT_SECRET:studymate-dev-only-secret-key-please-change}
+    issuer: studymate
+    access-token-minutes: 30
+    refresh-token-days: 7
+    auth-code-seconds: 300
+
+# AI 自定义
+ai:
+  bailian:
+    api-key: ${BAILIAN_API_KEY:}
+    base-url: ${BAILIAN_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
+  model: deepseek-v4.1-flash
+  embedding-model: qwen3.7-text-embedding
+  temperature: 0.7
+  max-tokens: 4096
+  embedding-dim: 1024
+  chunk-size: 512
+  chunk-overlap: 64
+  rag-top-k: 5
+
+  # LLM HTTP 客户端超时（长回答避免 10s 默认读超时中断）
+  http:
+    connect-timeout-ms: 10000
+    read-timeout-ms: 120000
+
+  # RAG 混合检索与三级精排降级
+  rag:
+    rewrite-enabled: true
+    recall-top-k: 20
+    rerank-top-k: 20
+    context-budget: 2400
+    route-timeout-ms: 1200
+    rerank-endpoint: https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank
+    rerank-model: gte-rerank-v2
+    rerank-timeout-ms: 1500
+    rerank-failure-threshold: 3
+    rerank-open-ms: 30000
+
+  # Agent 工作流：审查不通过重写，超限标记 needsManual
+  agent:
+    max-rewrites: 1
+    workflow-timeout-seconds: 120
+
+  # 统一模型调用层：框架 × 档位 × 能力位
+  gateway:
+    enabled: true
+    max-retries: 0
+    timeout-ms: 60000
+    backoff-base-ms: 500
+    backoff-max-ms: 5000
+    models:
+      - name: deepseek-v4.1-flash
+        framework: SPRING_AI
+        tier: BALANCED
+        capabilities: [CHAT, REASONING]
+        temperature: 0.7
+        max-tokens: 4096
+        reasoning-effort: minimal
+        timeout-ms: 60000
+      - name: qwen3.7-plus
+        framework: LANGCHAIN4J
+        tier: BALANCED
+        capabilities: [CHAT]
+        temperature: 0.7
+        max-tokens: 4096
+        reasoning-effort: minimal
+        timeout-ms: 45000
+      - name: qwen3.8-flash
+        framework: SPRING_AI
+        tier: FAST
+        capabilities: [CHAT]
+        temperature: 0.3
+        max-tokens: 4096
+        reasoning-effort: minimal
+        timeout-ms: 60000
+      - name: qwen3.8-max
+        framework: SPRING_AI
+        tier: STRONG
+        capabilities: [CHAT, REASONING]
+        temperature: 0.7
+        max-tokens: 8192
+        reasoning-effort: minimal
+        timeout-ms: 60000
+      - name: qwen3.7-text-embedding
+        framework: SPRING_AI
+        tier: BALANCED
+        capabilities: [EMBEDDING]
+        embedding-dimensions: 1024
+        timeout-ms: 30000
+
+  # Langfuse 全量 LLM 调用上报（默认关闭）
+  langfuse:
+    enabled: ${LANGFUSE_ENABLED:false}
+    host: ${LANGFUSE_HOST:https://cloud.langfuse.com}
+    public-key: ${LANGFUSE_PUBLIC_KEY:}
+    secret-key: ${LANGFUSE_SECRET_KEY:}
+
+  # 反向接入：作为 MCP 客户端消费外部工具
+  mcp:
+    enabled: ${MCP_CLIENT_ENABLED:true}
+    servers:
+      - name: studymate-self
+        # Spring AI MCP Server 默认以 SSE 暴露：/mcp/sse 握手，/mcp/message 回传
+        url: http://localhost:18090/mcp/sse
+        type: sse
+        timeout-seconds: 30
+
+# MyBatis-Plus
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+
+# SpringDoc / Swagger
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+
+# 知识库六阶段流水线
+kb:
+  base-path: ${KB_BASE_PATH:./data/kb}
+  extensions: [".pdf", ".docx", ".md", ".txt", ".html", ".pptx"]
+  auto-scan: false
+  parent-chunk-size: 1200
+  child-chunk-size: 320
+  child-overlap: 64
+  enhance-batch-size: 5
+  max-retries: 1
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      group:
+        liveness:
+          include: ping
+        readiness:
+          include: mysql,redis
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+
+# OTel
+otel:
+  service-name: studymate-api
+  exporter:
+    otlp:
+      endpoint: http://localhost:4317
+
+# 日志
+logging:
+  level:
+    com.studymate: DEBUG
+    org.springframework.ai: INFO
+    com.baomidou.mybatisplus: DEBUG
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
