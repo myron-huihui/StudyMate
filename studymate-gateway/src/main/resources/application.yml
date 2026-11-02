@@ -1,0 +1,69 @@
+server:
+  port: 19000
+
+spring:
+  application:
+    name: studymate-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+  cloud:
+    gateway:
+      routes:
+        - id: studymate-api
+          uri: http://localhost:18080
+          predicates:
+            - Path=/api/**
+          filters:
+            - name: Retry
+              args:
+                retries: 2
+                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE
+        - id: studymate-oauth2
+          uri: http://localhost:18080
+          predicates:
+            - Path=/oauth2/**,/.well-known/**
+        - id: studymate-mcp
+          uri: http://localhost:18090
+          predicates:
+            - Path=/mcp/**
+      discovery:
+        locator:
+          enabled: false
+
+# 限流（Redis Lua 固定窗口，Redis 不可用时本地降级）
+gateway:
+  rate-limit:
+    requests: 100
+    window-seconds: 60
+
+# JWT：必须与 studymate-api 的 security.jwt.secret 保持一致
+security:
+  jwt:
+    secret: ${JWT_SECRET:studymate-dev-only-secret-key-please-change}
+    issuer: studymate
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,refresh
+  endpoint:
+    health:
+      show-details: always
+      group:
+        liveness:
+          include: ping
+        readiness:
+          include: redis
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  level:
+    com.studymate: DEBUG
+    org.springframework.cloud.gateway: INFO
+    reactor: INFO
