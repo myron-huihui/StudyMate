@@ -1,0 +1,104 @@
+server:
+  port: 18090
+
+spring:
+  application:
+    name: studymate-mcp
+
+  ai:
+    openai:
+      api-key: ${BAILIAN_API_KEY:}
+      base-url: ${BAILIAN_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
+      chat:
+        options:
+          model: deepseek-v4.1-flash
+    mcp:
+      server:
+        enabled: true
+        name: studymate-mcp
+        version: 1.0.0
+        type: SYNC
+        stdio: false
+        base-url: http://localhost:18090
+        sse-endpoint: /mcp/sse
+        sse-message-endpoint: /mcp/message
+        request-timeout: 120s
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+
+  datasource:
+    mysql:
+      jdbc-url: jdbc:mysql://localhost:3306/studymate?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8
+      username: ${MYSQL_USER:root}
+      password: ${MYSQL_PASSWORD:root}
+    pgvector:
+      jdbc-url: jdbc:postgresql://localhost:5432/studymate
+      username: ${POSTGRES_USER:postgres}
+      password: ${POSTGRES_PASSWORD:postgres}
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  elasticsearch:
+    uris: http://localhost:9200
+
+ai:
+  bailian:
+    api-key: ${BAILIAN_API_KEY:}
+    base-url: ${BAILIAN_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
+  model: deepseek-v4.1-flash
+  embedding-model: qwen3.7-text-embedding
+  embedding-dim: 1024
+  chunk-size: 512
+  chunk-overlap: 64
+  rag-top-k: 5
+  gateway:
+    enabled: true
+    max-retries: 0
+    models:
+      - name: deepseek-v4.1-flash
+        framework: SPRING_AI
+        tier: BALANCED
+        capabilities: [CHAT, REASONING]
+        reasoning-effort: minimal
+        timeout-ms: 60000
+  langfuse:
+    enabled: ${LANGFUSE_ENABLED:false}
+    host: ${LANGFUSE_HOST:https://cloud.langfuse.com}
+    public-key: ${LANGFUSE_PUBLIC_KEY:}
+    secret-key: ${LANGFUSE_SECRET_KEY:}
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:studymate-dev-only-secret-key-please-change}
+    issuer: studymate
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      group:
+        liveness:
+          include: ping
+        readiness:
+          include: mysql,redis
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  level:
+    com.studymate: DEBUG
+    org.springframework.ai: INFO
