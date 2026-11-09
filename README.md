@@ -194,3 +194,7 @@ ai:
               KB 离线: 文档 → Tika → 分块 → 向量化 → pgVector + ES
               MCP(:18090): 暴露上述能力为 MCP tools
 ```
+
+## License
+
+[MIT](LICENSE) © 2026 myron-huihui
